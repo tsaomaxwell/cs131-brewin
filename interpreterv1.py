@@ -46,19 +46,24 @@ class Interpreter(InterpreterBase):
             func_name = statement_node.dict['name']
             args = statement_node.dict['args']
             self.run_func(func_name, args)
+        if self.trace_output:
+            print("{")
+            for key in self.variables_values:
+                print(str(key) + ": " + str(self.variables_values[key].dict['val']))
+            print("}")
     
     def evaluate_exp_var_or_val(self, node):
         if node.elem_type == InterpreterBase.INT_DEF or node.elem_type == InterpreterBase.STRING_DEF:
-            return node
+            return copy.deepcopy(node)
         elif node.elem_type == InterpreterBase.VAR_DEF:
             return self.evaluate_var(node)
         else:
             return self.evaluate_expression(node)
     
     def evaluate_var(self, var_node):
-        var_name = var_node.dict['name']
-        if var_name in self.variables_values:
-            return copy.copy(self.variables_values[var_name])
+        var_name = var_node.get('name')
+        if var_name in self.variables_values and self.variables_values[var_name] is not None:
+            return copy.deepcopy(self.variables_values[var_name])
         else:
             super().error(
                 ErrorType.NAME_ERROR,
@@ -78,16 +83,29 @@ class Interpreter(InterpreterBase):
             func_name = expression_node.dict['name']
             args = expression_node.dict['args']
             return self.run_func(func_name, args)
+        else:
+            super().error(ErrorType.NAME_ERROR,
+                      f"Unknown expression {expression_node}")
     
     def evaluate_add(self, op1, op2):
+        if self.trace_output:
+            print("add - {")
+            for key in self.variables_values:
+                print(str(key) + ": " + str(self.variables_values[key].dict['val']))
+            print("}")
         if op1.elem_type == InterpreterBase.STRING_DEF or op2.elem_type == InterpreterBase.STRING_DEF:
             super().error(
                 ErrorType.TYPE_ERROR,
                 "Incompatible types for add operation",
             )
         else:
-            result = copy.copy(op1)
+            result = copy.deepcopy(op1)
             result.dict['val'] = op1.dict['val'] + op2.dict['val']
+            if self.trace_output:
+                print("add end - {")
+                for key in self.variables_values:
+                    print(str(key) + ": " + str(self.variables_values[key].dict['val']))
+                print("}")
             return result
         
     def evaluate_subtract(self, op1, op2):
@@ -97,7 +115,7 @@ class Interpreter(InterpreterBase):
                 "Incompatible types for subtract operation",
             )
         else:
-            result = copy.copy(op1)
+            result = copy.deepcopy(op1)
             result.dict['val'] = op1.dict['val'] - op2.dict['val']
             return result
     
@@ -131,6 +149,11 @@ class Interpreter(InterpreterBase):
         string_to_output = ''
         for arg in args:
             value = self.evaluate_exp_var_or_val(arg)
+            if value is None:
+                super().error(
+                    ErrorType.NAME_ERROR,
+                    f"Missing some var",
+                )
             output_piece = value.dict['val']
             string_to_output += str(output_piece)
         if self.trace_output:
