@@ -97,6 +97,8 @@ class Interpreter(InterpreterBase):
                 condition = condition_value.dict['val']
             return None
         elif statement_node.elem_type == InterpreterBase.RETURN_DEF:
+            if statement_node.dict['expression'] is None:
+                return Element(InterpreterBase.NIL_DEF)
             return self.evaluate_exp_var_or_val(statement_node.dict['expression'], context)
         elif statement_node.elem_type == InterpreterBase.FCALL_DEF:
             func_name = statement_node.dict['name']
@@ -148,7 +150,7 @@ class Interpreter(InterpreterBase):
         elif expression_node.elem_type == '!=':
             op1 = self.evaluate_exp_var_or_val(expression_node.dict['op1'], context)
             op2 = self.evaluate_exp_var_or_val(expression_node.dict['op2'], context)
-            return self.evaluate_divide(op1, op2)
+            return self.evaluate_inequality(op1, op2)
         elif expression_node.elem_type == '<':
             op1 = self.evaluate_exp_var_or_val(expression_node.dict['op1'], context)
             op2 = self.evaluate_exp_var_or_val(expression_node.dict['op2'], context)
@@ -175,10 +177,10 @@ class Interpreter(InterpreterBase):
             return self.evaluate_or_or(op1, op2)
         elif expression_node.elem_type == InterpreterBase.NEG_DEF:
             op1 = self.evaluate_exp_var_or_val(expression_node.dict['op1'], context)
-            return self.evaluate_or_or(op1)
+            return self.evaluate_neg(op1)
         elif expression_node.elem_type == '!':
             op1 = self.evaluate_exp_var_or_val(expression_node.dict['op1'], context)
-            return self.evaluate_or_or(op1)
+            return self.evaluate_not(op1)
         elif expression_node.elem_type == InterpreterBase.FCALL_DEF:
             func_name = expression_node.dict['name']
             args = expression_node.dict['args']
@@ -236,7 +238,7 @@ class Interpreter(InterpreterBase):
             )
         else:
             result = copy.deepcopy(op1)
-            result.dict['val'] = int(op1.dict['val'] / op2.dict['val'])
+            result.dict['val'] = op1.dict['val'] // op2.dict['val']
             return result
         
     def evaluate_equality(self, op1, op2):
@@ -323,7 +325,7 @@ class Interpreter(InterpreterBase):
                 ErrorType.TYPE_ERROR,
                 "Incompatible types for ! operation",
             )
-        return Element(InterpreterBase.INT_DEF, val=(not op1.dict['val']))
+        return Element(InterpreterBase.BOOL_DEF, val=(not op1.dict['val']))
     
     def evaluate_arg_values(self, args, context):
         arg_value_list = []
@@ -336,6 +338,8 @@ class Interpreter(InterpreterBase):
             return self.handle_inputi(args, context)
         elif func_name == 'print':
             return self.handle_print(args, context)
+        elif func_name == 'inputs':
+            return self.handle_inputs(args, context)
         
         arg_values = self.evaluate_arg_values(args, context)
         for func_node in self.functions:
@@ -367,9 +371,9 @@ class Interpreter(InterpreterBase):
             f"No {func_name} function found that takes {len(arg_values)} parameters",
         )
 
-    def handle_inputi(self, args):
+    def handle_inputi(self, args, context):
         if len(args) == 1:
-            value = self.evaluate_exp_var_or_val(args[0])
+            value = self.evaluate_exp_var_or_val(args[0], context)
             prompt = value.dict['val']
             super().output(prompt)
         elif len(args) > 1:
@@ -382,15 +386,15 @@ class Interpreter(InterpreterBase):
         input_element = Element(InterpreterBase.INT_DEF, val=int_value)
         return input_element
     
-    def handle_inputs(self, args):
+    def handle_inputs(self, args, context):
         if len(args) == 1:
-            value = self.evaluate_exp_var_or_val(args[0])
+            value = self.evaluate_exp_var_or_val(args[0], context)
             prompt = value.dict['val']
             super().output(prompt)
         elif len(args) > 1:
             super().error(
                 ErrorType.NAME_ERROR,
-                f"No inputi() function found that takes > 1 parameter",
+                f"No inputs() function found that takes > 1 parameter",
             )
         user_input = super().get_input()
         str_value = str(user_input)
