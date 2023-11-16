@@ -36,6 +36,8 @@ class Interpreter(InterpreterBase):
             statements = func_node.dict['statements']
             context = {}
             for statement in statements:
+                print(context)
+                print('main')
                 run_result = self.run_statement(statement, context)
                 if run_result is not None:
                     return run_result
@@ -46,8 +48,12 @@ class Interpreter(InterpreterBase):
             right_node = statement_node.dict['expression']
             if key in context:
                 value = self.evaluate_exp_var_or_val(right_node, context)
+                print(value)
                 context[key].elem_type = value.elem_type
-                context[key].dict['val'] = value.dict['val']
+                if context[key].elem_type == InterpreterBase.FUNC_DEF:
+                    context[key].dict = value.dict
+                else:
+                    context[key].dict['val'] = value.dict['val']
             else:
                 context[key] = self.evaluate_exp_var_or_val(right_node, context)
             return None
@@ -132,6 +138,7 @@ class Interpreter(InterpreterBase):
                 free_vars[var_name] = context[var_name]
         lambda_node = copy.deepcopy(node)
         lambda_node.dict['free_vars'] = free_vars
+        return lambda_node
     
     def evaluate_var(self, var_node, context, ref=False):
         var_name = var_node.get('name')
@@ -235,7 +242,7 @@ class Interpreter(InterpreterBase):
                 "Incompatible types for add operation",
             )
         else:
-            result = copy.deepcopy(op1)
+            result = Element(InterpreterBase.INT_DEF, val=0)
             result.dict['val'] = int(op1.dict['val']) + int(op2.dict['val'])
             return result
         
@@ -247,7 +254,7 @@ class Interpreter(InterpreterBase):
                 "Incompatible types for subtract operation",
             )
         else:
-            result = copy.deepcopy(op1)
+            result = Element(InterpreterBase.INT_DEF, val=0)
             result.dict['val'] = int(op1.dict['val']) - int(op2.dict['val'])
             return result
         
@@ -259,7 +266,7 @@ class Interpreter(InterpreterBase):
                 "Incompatible types for multiply operation",
             )
         else:
-            result = copy.deepcopy(op1)
+            result = Element(InterpreterBase.INT_DEF, val=0)
             result.dict['val'] = int(op1.dict['val']) * int(op2.dict['val'])
             return result
     
@@ -271,8 +278,8 @@ class Interpreter(InterpreterBase):
                 "Incompatible types for divide operation",
             )
         else:
-            result = copy.deepcopy(op1)
-            result.dict['val'] = op1.dict['val'] // op2.dict['val']
+            result = Element(InterpreterBase.INT_DEF, val=0)
+            result.dict['val'] = int(op1.dict['val']) // int(op2.dict['val'])
             return result
         
     def evaluate_equality(self, op1, op2):
@@ -384,9 +391,13 @@ class Interpreter(InterpreterBase):
         for index in range(len(args)):
             if formal_params is not None:
                 reference = formal_params[index].elem_type == InterpreterBase.REFARG_DEF
-                arg_value_list.append(self.evaluate_exp_var_or_val(args[index], context, reference))
+                value = self.evaluate_exp_var_or_val(args[index], context, reference)
+                if reference:
+                    arg_value_list.append(value)
+                else:
+                    arg_value_list.append(copy.deepcopy(value))
             else:
-                arg_value_list.append(self.evaluate_exp_var_or_val(args[index], context))
+                arg_value_list.append(copy.deepcopy(self.evaluate_exp_var_or_val(args[index], context)))
         return arg_value_list
     
     def run_func(self, func_name, args, context):
@@ -407,12 +418,13 @@ class Interpreter(InterpreterBase):
                     func_context[arg_node.dict['name']] = arg_values[index]
                 statements = func_node.dict['statements']
                 for statement in statements:
+                    print(context)
+                    print(func_name)
                     run_result = self.run_statement(statement, func_context)
                     if run_result is not None:
                         return run_result
                 return None
         if func_name in context:
-            print(context)
             if context[func_name].elem_type != InterpreterBase.FUNC_DEF and context[func_name].elem_type != InterpreterBase.LAMBDA_DEF:
                 super().error(
                     ErrorType.TYPE_ERROR,
@@ -427,7 +439,8 @@ class Interpreter(InterpreterBase):
                     func_context[arg_node.dict['name']] = arg_values[index]
                 if context[func_name].elem_type == InterpreterBase.LAMBDA_DEF:
                     for key in func_node.dict['free_vars']:
-                        func_context[key] = func_node.dict['free_vars'][key]
+                        if func_node.dict['free_vars'][key] is not None:
+                            func_context[key] = func_node.dict['free_vars'][key]
                 statements = func_node.dict['statements']
                 for statement in statements:
                     run_result = self.run_statement(statement, func_context)
